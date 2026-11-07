@@ -1,0 +1,18 @@
+[Unit]
+Description=HomeKit dummy switches (hkswitches)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/local/bin/hkswitches -data /var/lib/hkswitches
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+RestartSec=5
+DynamicUser=yes
+StateDirectory=hkswitches
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+
+[Install]
+WantedBy=multi-user.target
