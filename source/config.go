@@ -29,6 +29,10 @@ type SwitchConfig struct {
 	// RememberState keeps the on/off state across restarts. When false the
 	// switch starts in its resting state.
 	RememberState bool `json:"remember_state"`
+	// RestartTimerOnRepeat: when HomeKit sets the switch to its active state
+	// while it is already there, the auto-reset countdown starts over.
+	// Only matters when AutoOffSeconds > 0.
+	RestartTimerOnRepeat bool `json:"restart_timer_on_repeat"`
 }
 
 // Config is the whole program configuration, stored as config.json.

@@ -30,10 +30,11 @@ type statusView struct {
 }
 
 type switchInput struct {
-	Name           *string  `json:"name"`
-	AutoOffSeconds *float64 `json:"auto_off_seconds"`
-	Reverse        *bool    `json:"reverse"`
-	RememberState  *bool    `json:"remember_state"`
+	Name                 *string  `json:"name"`
+	AutoOffSeconds       *float64 `json:"auto_off_seconds"`
+	Reverse              *bool    `json:"reverse"`
+	RememberState        *bool    `json:"remember_state"`
+	RestartTimerOnRepeat *bool    `json:"restart_timer_on_repeat"`
 }
 
 func (m *Manager) webHandler() http.Handler {
@@ -230,6 +231,9 @@ func applyInput(sc *SwitchConfig, in switchInput) {
 	}
 	if in.RememberState != nil {
 		sc.RememberState = *in.RememberState
+	}
+	if in.RestartTimerOnRepeat != nil {
+		sc.RestartTimerOnRepeat = *in.RestartTimerOnRepeat
 	}
 }
 

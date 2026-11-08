@@ -22,6 +22,16 @@ You manage it from a web page or by editing a config file.
 
 If the old Homebridge is still installed, stop it first with `sudo systemctl disable --now homebridge`.
 
+## Upgrade
+
+From your Mac, in this folder (needs Go: `brew install go`):
+```
+./deploy.sh pi@<pi-address>
+```
+It builds the program for the Pi, copies it over, and runs `install.sh` there with sudo (it asks for your password if needed).
+Your switches, their states and the HomeKit pairing are kept. Each run first saves a copy of `config.json` to `/var/backups/hkswitches/`.
+Running `sudo ./install.sh` again on the Pi is also safe.
+
 ## Switch settings
 
 | Setting | What it does |
@@ -30,6 +40,7 @@ If the old Homebridge is still installed, stop it first with `sudo systemctl dis
 | **Turn back after (seconds)** | `0` = stays where you put it. Any other number = flips back to its resting state after that many seconds (decimals OK). Use it to trigger an automation with a short pulse. |
 | **Reverse** | The resting state becomes **on** instead of off |
 | **Remember on/off** | Keeps the state across reboots. When off, the switch starts in its resting state. |
+| **Restart timer when turned on again** | Only matters when **Turn back after** is more than 0. When HomeKit turns the switch on while it's already on, the countdown starts over from zero. Without it, that repeat is ignored and the timer keeps running. (With **Reverse**, "on" here means off.) |
 
 Each switch has a fixed ID that is never reused, so renaming or deleting other switches won't break your automations.
 Renaming a switch here doesn't rename it in the Home app if it's already there. Rename it in the Home app too.
@@ -45,6 +56,7 @@ To add a switch by hand, add an entry with no `id`. One is assigned automaticall
 ```json
 { "name": "Movie Mode", "auto_off_seconds": 0, "reverse": false, "remember_state": true }
 ```
+`restart_timer_on_repeat` (true/false) is optional and defaults to `false`.
 Other settings in the file:
 - `web_password`: when set, the web page asks for a password. Leave the username blank or type anything.
 - `web_port`: the port for the web page.

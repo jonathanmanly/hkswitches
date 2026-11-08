@@ -21,7 +21,7 @@ import (
 	haplog "github.com/brutella/hap/log"
 )
 
-var version = "1.0.0"
+var version = "1.1.0"
 
 // Manager owns the config, the switch states and the running HomeKit server.
 type Manager struct {
@@ -168,40 +168,10 @@ func (m *Manager) startHAP() error {
 	m.accs = map[uint64]*accessory.Switch{}
 	var list []*accessory.A
 	for _, sc := range cfg.Switches {
-		sc := sc
-		sw := accessory.NewSwitch(accessory.Info{
-			Name:         sc.Name,
-			Manufacturer: "hkswitches",
-			Model:        "Dummy Switch",
-			SerialNumber: fmt.Sprintf("HKS-%d", sc.ID),
-			Firmware:     version,
-		})
-		sw.Id = sc.ID
-
-		on := sc.Reverse // resting state
-		if sc.RememberState {
-			if v, ok := m.state[sc.ID]; ok {
-				on = v
-			}
-		}
-		m.state[sc.ID] = on
-		sw.Switch.On.SetValue(on)
-
-		id := sc.ID
-		sw.Switch.On.OnValueRemoteUpdate(func(v bool) {
-			m.mu.Lock()
-			defer m.mu.Unlock()
-			if m.accs[id] != sw { // callback from an old server instance
-				return
-			}
-			log.Printf("HomeKit set %q -> %s", sc.Name, onOff(v))
-			m.changedLocked(id, v)
-		})
-
-		m.accs[id] = sw
+		sw := m.newSwitchLocked(sc)
 		list = append(list, sw.A)
 		// Re-arm the auto-reset timer if we restarted while flipped.
-		m.armTimerLocked(id)
+		m.armTimerLocked(sc.ID)
 	}
 
 	store := hap.NewFsStore(filepath.Join(m.dataDir, "homekit"))
@@ -227,6 +197,47 @@ func (m *Manager) startHAP() error {
 	}()
 	m.saveStateLocked()
 	return nil
+}
+
+// newSwitchLocked builds the accessory for one switch, sets its starting
+// value and registers it in m.accs. m.mu must be held.
+func (m *Manager) newSwitchLocked(sc SwitchConfig) *accessory.Switch {
+	sw := accessory.NewSwitch(accessory.Info{
+		Name:         sc.Name,
+		Manufacturer: "hkswitches",
+		Model:        "Dummy Switch",
+		SerialNumber: fmt.Sprintf("HKS-%d", sc.ID),
+		Firmware:     version,
+	})
+	sw.Id = sc.ID
+
+	on := sc.Reverse // resting state
+	if sc.RememberState {
+		if v, ok := m.state[sc.ID]; ok {
+			on = v
+		}
+	}
+	m.state[sc.ID] = on
+	sw.Switch.On.SetValue(on)
+	sw.Switch.On.SetUpdateOnSameValue(sc.RestartTimerOnRepeat)
+
+	id := sc.ID
+	sw.Switch.On.OnValueRemoteUpdate(func(v bool) {
+		m.mu.Lock()
+		defer m.mu.Unlock()
+		if m.accs[id] != sw { // callback from an old server instance
+			return
+		}
+		if v == m.state[id] {
+			log.Printf("HomeKit set %q -> %s again", sc.Name, onOff(v))
+		} else {
+			log.Printf("HomeKit set %q -> %s", sc.Name, onOff(v))
+		}
+		m.changedLocked(id, v)
+	})
+
+	m.accs[id] = sw
+	return sw
 }
 
 func (m *Manager) stopHAP() {
@@ -258,9 +269,15 @@ func (m *Manager) restartHAP() error {
 // ---- switching logic ----
 
 // changedLocked records a new value and handles auto-reset. m.mu must be held.
+// It also runs for a repeat write of the current value (restart_timer_on_repeat),
+// which re-arms the timer from zero.
 func (m *Manager) changedLocked(id uint64, on bool) {
+	same := m.state[id] == on
 	m.state[id] = on
 	m.armTimerLocked(id)
+	if same {
+		return // nothing new to save; spares the SD card on every motion event
+	}
 	if i := m.cfg.find(id); i >= 0 && m.cfg.Switches[i].RememberState {
 		m.saveStateLocked()
 	}
@@ -340,6 +357,9 @@ func (m *Manager) applyConfig(newCfg *Config, restart bool) error {
 	defer m.mu.Unlock()
 	m.cfg = newCfg
 	for _, s := range newCfg.Switches {
+		if sw, ok := m.accs[s.ID]; ok {
+			sw.Switch.On.SetUpdateOnSameValue(s.RestartTimerOnRepeat)
+		}
 		m.armTimerLocked(s.ID)
 	}
 	m.saveStateLocked()

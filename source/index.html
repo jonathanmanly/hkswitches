@@ -45,6 +45,7 @@
   label.f { display: grid; gap: 4px; font-size: .85rem; color: var(--muted); }
   label.c { display: flex; gap: 8px; align-items: flex-start; font-size: .92rem; }
   label.c input { margin-top: 3px; }
+  label.c:has(input:disabled) { color: var(--muted); }
   input[type=text], input[type=number] { font: inherit; padding: 9px 10px; border-radius: 9px;
         border: 1px solid var(--line); background: var(--bg); color: var(--ink); width: 100%; }
   .btns { display: flex; gap: 8px; justify-content: flex-end; }
@@ -88,6 +89,7 @@
       <label class="f">Turn back after (seconds, 0 = stay put)<input type="number" name="auto" min="0" step="any" value="0"></label>
       <label class="c"><input type="checkbox" name="reverse"> <span>Reverse – resting state is <b>on</b></span></label>
       <label class="c"><input type="checkbox" name="remember" checked> <span>Remember on/off across restarts</span></label>
+      <label class="c"><input type="checkbox" name="restart" disabled> <span>Restart timer when turned on again <span class="small">(needs a “turn back after” time)</span></span></label>
       <div class="btns"><button class="b primary" type="submit">Add switch</button></div>
     </form>
   </div>
@@ -127,7 +129,8 @@ function esc(s) { return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&
 
 function describe(s) {
   const rest = s.reverse ? "on" : "off";
-  if (s.auto_off_seconds > 0) return `Turns back ${rest} after ${s.auto_off_seconds}s`;
+  if (s.auto_off_seconds > 0) return `Turns back ${rest} after ${s.auto_off_seconds}s` +
+                                     (s.restart_timer_on_repeat ? " · timer restarts when turned on again" : "");
   return s.reverse ? "Stays where you put it · reversed" : "Stays where you put it";
 }
 
@@ -146,7 +149,7 @@ function render(d) {
 
   // Only rebuild the list when switches or their settings changed,
   // so polling doesn't wipe out a half-typed edit.
-  const key = JSON.stringify(d.switches.map(s => [s.id, s.name, s.auto_off_seconds, s.reverse, s.remember_state]));
+  const key = JSON.stringify(d.switches.map(s => [s.id, s.name, s.auto_off_seconds, s.reverse, s.remember_state, s.restart_timer_on_repeat]));
   if (key !== shapeKey) { shapeKey = key; buildList(d.switches); }
   for (const s of d.switches) {
     const cb = $(`#t${s.id}`); if (cb) cb.checked = s.on;
@@ -168,6 +171,7 @@ function buildList(list) {
         <label class="f">Turn back after (seconds, 0 = stay put)<input type="number" name="auto" min="0" step="any" value="${s.auto_off_seconds}"></label>
         <label class="c"><input type="checkbox" name="reverse" ${s.reverse ? "checked" : ""}> <span>Reverse – resting state is <b>on</b></span></label>
         <label class="c"><input type="checkbox" name="remember" ${s.remember_state ? "checked" : ""}> <span>Remember on/off across restarts</span></label>
+        <label class="c"><input type="checkbox" name="restart" ${s.restart_timer_on_repeat ? "checked" : ""} ${s.auto_off_seconds > 0 ? "" : "disabled"}> <span>Restart timer when turned on again <span class="small">(needs a “turn back after” time)</span></span></label>
         <div class="small">Switch ID ${s.id} (fixed, so automations survive renames)</div>
         <div class="btns">
           <button class="b danger" type="button" data-act="delete">Delete</button>
@@ -180,8 +184,13 @@ function buildList(list) {
 
 function formValues(f) {
   return { name: f.name.value.trim(), auto_off_seconds: Math.max(0, parseFloat(f.auto.value) || 0),
-           reverse: f.reverse.checked, remember_state: f.remember.checked };
+           reverse: f.reverse.checked, remember_state: f.remember.checked,
+           restart_timer_on_repeat: f.restart.checked };
 }
+
+// "Restart timer" only matters with an auto-off time, so grey it out at 0.
+function syncRestart(f) { f.restart.disabled = !(parseFloat(f.auto.value) > 0); }
+document.addEventListener("input", e => { if (e.target.name === "auto" && e.target.form) syncRestart(e.target.form); });
 
 async function run(fn, okText) {
   if (busy) return; busy = true;
@@ -220,7 +229,7 @@ $("#list").addEventListener("submit", e => {
 
 $("#add").addEventListener("submit", e => {
   e.preventDefault(); const f = e.target;
-  run(async () => { const d = await api("POST", "api/switches", formValues(f)); f.reset(); f.remember.checked = true; return d; },
+  run(async () => { const d = await api("POST", "api/switches", formValues(f)); f.reset(); f.remember.checked = true; syncRestart(f); return d; },
       "Added – it'll show up in the Home app shortly");
 });
 

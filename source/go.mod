@@ -25,3 +25,5 @@ require (
 	gopkg.in/Regis24GmbH/go-diacritics.v2 v2.0.3 // indirect
 )
 
+// Vendored with a small patch; see third_party/hap/HKSWITCHES_PATCH.md.
+replace github.com/brutella/hap => ./third_party/hap
