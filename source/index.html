@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dummy Switches</title>
+<style>
+  :root {
+    --bg: #f4f4f1; --card: #fff; --ink: #1c1c1a; --muted: #6b6b66; --line: #e2e2dc;
+    --accent: #e8a33d; --on: #34a853; --danger: #c0392b; --radius: 14px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #161615; --card: #22221f; --ink: #ecece6; --muted: #9a9a92; --line: #34342f; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 16px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 560px; margin: 0 auto; padding: 20px 16px 60px; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+  h1 { font-size: 1.5rem; margin: 0; cursor: pointer; }
+  h1:hover::after { content: " ✎"; font-size: .9rem; color: var(--muted); }
+  h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 26px 4px 8px; }
+  .badge { font-size: .8rem; padding: 4px 10px; border-radius: 99px; background: var(--line); color: var(--muted); white-space: nowrap; }
+  .badge.ok { background: color-mix(in srgb, var(--on) 18%, transparent); color: var(--on); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); }
+  .pair { display: flex; gap: 16px; align-items: center; padding: 16px; }
+  .pair img { width: 120px; height: 120px; border-radius: 8px; background: #fff; padding: 6px; flex: none; }
+  .code { font: 600 1.6rem/1 ui-monospace, Menlo, monospace; letter-spacing: .04em; margin: 4px 0 8px; }
+  .small { font-size: .85rem; color: var(--muted); }
+  .sw { border-top: 1px solid var(--line); }
+  .sw:first-child { border-top: 0; }
+  .row { display: flex; align-items: center; gap: 12px; padding: 14px 16px; }
+  .row .name { flex: 1; min-width: 0; }
+  .row .name b { display: block; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .gear { background: none; border: 0; color: var(--muted); font-size: 1.2rem; cursor: pointer; padding: 4px 6px; }
+  .toggle { position: relative; width: 52px; height: 32px; flex: none; }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle span { position: absolute; inset: 0; background: var(--line); border-radius: 99px; transition: .2s; cursor: pointer; }
+  .toggle span::before { content: ""; position: absolute; width: 26px; height: 26px; left: 3px; top: 3px;
+                         background: #fff; border-radius: 50%; transition: .2s; box-shadow: 0 1px 3px rgba(0,0,0,.3); }
+  .toggle input:checked + span { background: var(--on); }
+  .toggle input:checked + span::before { transform: translateX(20px); }
+  .edit { padding: 4px 16px 16px; display: grid; gap: 10px; }
+  .edit[hidden] { display: none; }
+  label.f { display: grid; gap: 4px; font-size: .85rem; color: var(--muted); }
+  label.c { display: flex; gap: 8px; align-items: flex-start; font-size: .92rem; }
+  label.c input { margin-top: 3px; }
+  label.c:has(input:disabled) { color: var(--muted); }
+  input[type=text], input[type=number] { font: inherit; padding: 9px 10px; border-radius: 9px;
+        border: 1px solid var(--line); background: var(--bg); color: var(--ink); width: 100%; }
+  .btns { display: flex; gap: 8px; justify-content: flex-end; }
+  button.b { font: inherit; font-weight: 600; padding: 9px 16px; border-radius: 9px; border: 1px solid var(--line);
+             background: var(--card); color: var(--ink); cursor: pointer; }
+  button.b.primary { background: var(--accent); border-color: var(--accent); color: #1c1c1a; }
+  button.b.danger { color: var(--danger); margin-right: auto; }
+  button.b:disabled { opacity: .5; cursor: default; }
+  .empty { padding: 18px 16px; color: var(--muted); }
+  #msg { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: var(--ink); color: var(--bg);
+         padding: 10px 16px; border-radius: 10px; font-size: .9rem; opacity: 0; transition: opacity .2s; pointer-events: none; max-width: 90vw; }
+  #msg.show { opacity: 1; }
+  #msg.err { background: var(--danger); color: #fff; }
+  details summary { cursor: pointer; color: var(--muted); font-size: .9rem; margin: 26px 4px 8px; }
+  code { font-size: .85em; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1 id="bridge" title="Rename bridge">Dummy Switches</h1>
+    <span id="paired" class="badge">…</span>
+  </header>
+
+  <div id="pairing" class="card pair" hidden>
+    <img src="qr.png" alt="HomeKit setup QR code" id="qr">
+    <div>
+      <div class="small">HomeKit setup code</div>
+      <div class="code" id="pin">———</div>
+      <div class="small">In the Home app tap <b>+</b> → <b>Add Accessory</b> and scan this code, or choose “More options” and enter the number. Accept the “uncertified accessory” warning.</div>
+    </div>
+  </div>
+
+  <h2>Switches</h2>
+  <div id="list" class="card"></div>
+
+  <h2>Add a switch</h2>
+  <div class="card">
+    <form id="add" class="edit" style="padding-top:16px">
+      <label class="f">Name<input type="text" name="name" maxlength="64" required placeholder="e.g. Movie Mode"></label>
+      <label class="f">Turn back after (seconds, 0 = stay put)<input type="number" name="auto" min="0" step="any" value="0"></label>
+      <label class="c"><input type="checkbox" name="reverse"> <span>Reverse – resting state is <b>on</b></span></label>
+      <label class="c"><input type="checkbox" name="remember" checked> <span>Remember on/off across restarts</span></label>
+      <label class="c"><input type="checkbox" name="restart" disabled> <span>Restart timer when turned on again <span class="small">(needs a “turn back after” time)</span></span></label>
+      <div class="btns"><button class="b primary" type="submit">Add switch</button></div>
+    </form>
+  </div>
+
+  <details>
+    <summary>Paired already? Show setup code again</summary>
+    <div class="card pair" id="pairing2"></div>
+  </details>
+
+  <p class="small" style="margin-top:28px">
+    New switches appear in the Home app within a few seconds (usually in the room the bridge is in).
+    Renaming here doesn't rename a switch already in the Home app – rename it there too.
+    Scripts can flip switches with <code>POST /api/switches/&lt;id&gt;/on|off|toggle</code>.
+    <span id="ver"></span>
+  </p>
+</main>
+<div id="msg"></div>
+
+<script>
+const $ = (s, el = document) => el.querySelector(s);
+let data = null, shapeKey = "", openId = null, busy = false;
+
+function toast(text, err) {
+  const m = $("#msg"); m.textContent = text; m.className = "show" + (err ? " err" : "");
+  clearTimeout(toast.t); toast.t = setTimeout(() => m.className = "", err ? 4000 : 1800);
+}
+
+async function api(method, path, body) {
+  const r = await fetch(path, { method, headers: { "Content-Type": "application/json" },
+                                body: body ? JSON.stringify(body) : undefined });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || r.statusText);
+  return j;
+}
+
+function esc(s) { return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+
+function describe(s) {
+  const rest = s.reverse ? "on" : "off";
+  if (s.auto_off_seconds > 0) return `Turns back ${rest} after ${s.auto_off_seconds}s` +
+                                     (s.restart_timer_on_repeat ? " · timer restarts when turned on again" : "");
+  return s.reverse ? "Stays where you put it · reversed" : "Stays where you put it";
+}
+
+function render(d) {
+  data = d;
+  $("#bridge").textContent = d.bridge_name;
+  document.title = d.bridge_name;
+  const p = $("#paired");
+  p.textContent = d.error ? "HomeKit error" : d.paired ? "Paired" : "Not paired yet";
+  p.className = "badge" + (d.paired && !d.error ? " ok" : "");
+  p.title = d.error || "";
+  $("#pin").textContent = d.pin;
+  $("#ver").textContent = "v" + d.version;
+  $("#pairing").hidden = d.paired;
+  if (d.paired && !$("#pairing2").innerHTML) $("#pairing2").innerHTML = $("#pairing").innerHTML;
+
+  // Only rebuild the list when switches or their settings changed,
+  // so polling doesn't wipe out a half-typed edit.
+  const key = JSON.stringify(d.switches.map(s => [s.id, s.name, s.auto_off_seconds, s.reverse, s.remember_state, s.restart_timer_on_repeat]));
+  if (key !== shapeKey) { shapeKey = key; buildList(d.switches); }
+  for (const s of d.switches) {
+    const cb = $(`#t${s.id}`); if (cb) cb.checked = s.on;
+  }
+}
+
+function buildList(list) {
+  const el = $("#list");
+  if (!list.length) { el.innerHTML = `<div class="empty">No switches yet – add one below.</div>`; return; }
+  el.innerHTML = list.map(s => `
+    <div class="sw" data-id="${s.id}">
+      <div class="row">
+        <div class="name"><b>${esc(s.name)}</b><span class="small">${describe(s)}</span></div>
+        <button class="gear" data-act="edit" title="Settings">⚙︎</button>
+        <label class="toggle"><input type="checkbox" id="t${s.id}" ${s.on ? "checked" : ""}><span></span></label>
+      </div>
+      <form class="edit" ${openId === s.id ? "" : "hidden"}>
+        <label class="f">Name<input type="text" name="name" maxlength="64" required value="${esc(s.name)}"></label>
+        <label class="f">Turn back after (seconds, 0 = stay put)<input type="number" name="auto" min="0" step="any" value="${s.auto_off_seconds}"></label>
+        <label class="c"><input type="checkbox" name="reverse" ${s.reverse ? "checked" : ""}> <span>Reverse – resting state is <b>on</b></span></label>
+        <label class="c"><input type="checkbox" name="remember" ${s.remember_state ? "checked" : ""}> <span>Remember on/off across restarts</span></label>
+        <label class="c"><input type="checkbox" name="restart" ${s.restart_timer_on_repeat ? "checked" : ""} ${s.auto_off_seconds > 0 ? "" : "disabled"}> <span>Restart timer when turned on again <span class="small">(needs a “turn back after” time)</span></span></label>
+        <div class="small">Switch ID ${s.id} (fixed, so automations survive renames)</div>
+        <div class="btns">
+          <button class="b danger" type="button" data-act="delete">Delete</button>
+          <button class="b" type="button" data-act="cancel">Cancel</button>
+          <button class="b primary" type="submit">Save</button>
+        </div>
+      </form>
+    </div>`).join("");
+}
+
+function formValues(f) {
+  return { name: f.name.value.trim(), auto_off_seconds: Math.max(0, parseFloat(f.auto.value) || 0),
+           reverse: f.reverse.checked, remember_state: f.remember.checked,
+           restart_timer_on_repeat: f.restart.checked };
+}
+
+// "Restart timer" only matters with an auto-off time, so grey it out at 0.
+function syncRestart(f) { f.restart.disabled = !(parseFloat(f.auto.value) > 0); }
+document.addEventListener("input", e => { if (e.target.name === "auto" && e.target.form) syncRestart(e.target.form); });
+
+async function run(fn, okText) {
+  if (busy) return; busy = true;
+  document.querySelectorAll("button.b").forEach(b => b.disabled = true);
+  try { const d = await fn(); shapeKey = ""; render(d); if (okText) toast(okText); }
+  catch (e) { toast(e.message, true); }
+  finally { busy = false; document.querySelectorAll("button.b").forEach(b => b.disabled = false); }
+}
+
+$("#list").addEventListener("change", e => {
+  if (!e.target.id.startsWith("t")) return;
+  const id = e.target.id.slice(1);
+  api("POST", `api/switches/${id}/${e.target.checked ? "on" : "off"}`).then(render).catch(err => toast(err.message, true));
+});
+
+$("#list").addEventListener("click", e => {
+  const act = e.target.closest("[data-act]")?.dataset.act; if (!act) return;
+  const sw = e.target.closest(".sw"); const id = +sw.dataset.id; const form = $("form", sw);
+  if (act === "edit") { const open = form.hidden; document.querySelectorAll("#list form").forEach(f => f.hidden = true);
+                        form.hidden = !open; openId = open ? id : null; }
+  if (act === "cancel") { openId = null; shapeKey = ""; render(data); }
+  if (act === "delete") {
+    const name = data.switches.find(s => s.id === id)?.name;
+    if (confirm(`Delete “${name}”? It will disappear from the Home app along with any automations that use it.`)) {
+      openId = null; run(() => api("DELETE", `api/switches/${id}`), "Deleted");
+    }
+  }
+});
+
+$("#list").addEventListener("submit", e => {
+  e.preventDefault();
+  const id = +e.target.closest(".sw").dataset.id;
+  openId = null;
+  run(() => api("PUT", `api/switches/${id}`, formValues(e.target)), "Saved");
+});
+
+$("#add").addEventListener("submit", e => {
+  e.preventDefault(); const f = e.target;
+  run(async () => { const d = await api("POST", "api/switches", formValues(f)); f.reset(); f.remember.checked = true; syncRestart(f); return d; },
+      "Added – it'll show up in the Home app shortly");
+});
+
+$("#bridge").addEventListener("click", () => {
+  const n = prompt("Bridge name", data?.bridge_name); if (!n || n.trim() === data?.bridge_name) return;
+  run(() => api("PUT", "api/bridge", { bridge_name: n.trim() }), "Bridge renamed");
+});
+
+async function poll() {
+  try { if (!busy) render(await api("GET", "api/status")); } catch (e) {}
+  setTimeout(poll, 2500);
+}
+poll();
+</script>
+</body>
+</html>
